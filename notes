@@ -1,0 +1,11 @@
+
+
+Creating a pip package:
+https://packaging.python.org/en/latest/tutorials/packaging-projects/
+
+version must be updated in package.xml and pyproject.toml
+
+build:
+python3 -m build
+
+upload:
