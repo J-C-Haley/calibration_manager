@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "calibration_manager"
-version = "0.0.1"
+version = "0.0.2"
 authors = [
   { name="James Haley", email="J-C-Haley@users.noreply.github.com" },
 ]
@@ -19,6 +19,7 @@ classifiers = [
 
 dependencies = [
   "numpy",
+  "pandas",
   "ruamel.yaml>0.17.0",
   "django>2.1; os_name != 'nt'",
   "django>2.0; os_name == 'nt'",
