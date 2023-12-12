@@ -1,2 +1,3 @@
 dist/
 src/calibration_manager.egg-info/
+*__pycache__*

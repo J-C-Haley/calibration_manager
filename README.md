@@ -8,19 +8,19 @@ Once created, calibrations can be loaded and accessed as a dictionary:
 ```
 import calibration_manager as cm
 
-cal = cm.Calibration('my_machine')
-cal.load_all()
-p = cal.cmp['my_parameter']
-arr = cal.cmp['my_np_array']
+ws = cm.Workspace('my_machine')
+ws.save_example_cal()
+components = ws.load()
+pA = ws.cfg['example_component']['test_param_A']
+cA = ws.cal['example_component']['test_cal_A']
+arr = ws.cal['example_component']['test_array_B']
 ```
-
-If ros is installed (optional!) and the code has connection to a roscore, 
-it will automatically upload parameters to the rosparam server
-in /{my_machine}/{my_component}/{ros_params} (location can be overwritten).
-
-To create an example calibration, run the following and look in ~/.ros/calibrations/:
+Don't forget that you can unpack all the dict keys into a function variable directly:
 ```
-cal.save_example_cal()
+def func(test_param_A, test_array_B, **kwargs):
+    return test_param_A + test_array_B
+
+arr_B = func(**ws.cal['example_component'])
 ```
 
 To save a new calibration, just construct a dictionary of your parameters and pass to cal:
@@ -30,14 +30,21 @@ my_calibration = {
     'A': 3.0,
     'B': True,
     'C': 'pinhole',
-    subsystem = {
+    'subsystem': {
         '1': my_np_array
     }
 }
-cal.save('camera1', my_calibration)
+ws.save_component_cal('camera1', my_calibration)
 ```
 
-Calibrations are stored in ~/.ros/calibrations/ by default, but this can overwritten with:
+If ros is installed (optional!) and the code has connection to a roscore, 
+it can automatically upload parameters to the rosparam server.
+If a ros_param_ns is provided in load(), all values in the cal.yaml will be loaded, or
+if ros_param_ns is set to 'default', it will default to /{machine}/{component}/{params}.
+
+Workspaces are stored in ~/.ros/workspaces/ by default, but this can overwritten with:
 ```
-cal = cm.Calibration('my_machine', '/my/calibration/location/')
+ws = cm.Workspace('my_machine', '/my/workspace/root/dir/')
 ```
+
+Suggestions and commits are welcome.
