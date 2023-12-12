@@ -12,7 +12,7 @@ if __name__ == '__main__':
     rospy.init_node('test_node')
     
     # Save a test calibration
-    ws = cm.Workspace('my_machine')
+    setup = cm.Setup('my_machine')
     my_config = {
         'A': 3.0,
         'B': True,
@@ -25,13 +25,13 @@ if __name__ == '__main__':
         'flatfield': np.zeros((3,3)),
         'curve':pd.DataFrame({'x':[0,1,2],'y':[4,6,7]})
     }
-    ws.save_component_cfg('my_camera', my_config)
-    ws.save_component_cal('my_camera', my_calibration)
+    setup.save_component_cfg('my_camera', my_config)
+    setup.save_component_cal('my_camera', my_calibration)
 
     # Load a calibration
-    ws2 = cm.Workspace('my_machine')
-    ws2.load()
+    setup2 = cm.Setup('my_machine')
+    setup2.load()
     print('configuration loaded:')
-    print(ws2.cfg['my_camera'])    
+    print(setup2.cfg['my_camera'])    
     print('calibration loaded:')
-    print(ws2.cal['my_camera'])
+    print(setup2.cal['my_camera'])

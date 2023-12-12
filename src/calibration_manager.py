@@ -15,39 +15,39 @@ try:
 except:
     imports_ros = False
 
-class Workspace:
+class Setup:
     """
-    A tool to flexibly store, load, and use configuration and calibration data for a machine workspace
+    A tool to flexibly store, load, and use configuration and calibration data for a machine setup
     
-    Each machine workspace has any number of named components, which store a current configuration, and a
+    Each machine setup has any number of named components, which store a current configuration, and a
     timeline history of calibrations (with the config at time of calibration)
 
-    workspaces_root_dir: str path to either the current machine calibration storage location 
-    (~/.ros/calibrations/, /networkdrive/calibrations, etc), 
+    setup_storage: str path to either the current machine setup storage location 
+    (~/.ros/setups/, /networkdrive/setups/, etc), 
     or a stored backup of the calibration ({build_name}/SCOPS/cal/)
     """
-    def __init__(self,machine: str, workspaces_root_dir: str = '~/.ros/workspaces/'):
-        self.machine = machine
-        self.ws_root_dir = pathlib.Path(workspaces_root_dir)
-        self.ws_root_dir = self.ws_root_dir.expanduser()
-        self.machine_dir = self.ws_root_dir / self.machine
+    def __init__(self, setup: str, setup_storage: str = '~/.ros/setups/'):
+        self.setup = setup
+        self.setup_storage = pathlib.Path(setup_storage)
+        self.setup_storage = self.setup_storage.expanduser()
+        self.setup_dir = self.setup_storage / self.setup
         
         self.cfg = {}
         self.cal = {}
         self.paths = {}
 
     def load(self, run_time_epoch: int = None, ros_param_ns: str = None):
-        '''Loads all component configurations & calibrations of a machine workspace
+        '''Loads all component configurations & calibrations of a machine setup
         
         If a run_time_epoch is specified, the latest config/calibration preceeding the time will be loaded,
         otherwise the most recent config/calibration will be loaded.
 
         If a ros_param_ns is provided, all values in the cal.yaml will be loaded to the parameter server.
-        If ros_param_ns is set to 'default', it will default to /{machine}/{component}/{params}
+        If ros_param_ns is set to 'default', it will default to /{setup}/{component}/{params}
         If ros_param_ns is set to None, no parameters will be uploaded
         '''
         self.component_names = []
-        for component_dir in self.machine_dir.iterdir():
+        for component_dir in self.setup_dir.iterdir():
             if not component_dir.is_dir():
                 continue
             component_name = str(component_dir.name)
@@ -56,13 +56,13 @@ class Workspace:
         return self.component_names
     
     def load_component(self, component_name: str, run_time_epoch: int = None, ros_param_ns: str = None):
-        '''Load a single component to the machine workspace'''
+        '''Load a single component to the setup'''
         self.load_component_cfg(component_name,run_time_epoch, ros_param_ns)
         self.load_component_cal(component_name,run_time_epoch, ros_param_ns)
 
     def load_component_cfg(self, component_name: str, run_time_epoch: int = None, ros_param_ns: str = None, default_cfg: str = None):
-        '''Load a single component's configuration to the machine workspace'''
-        component_dir = self.machine_dir / (component_name+'/')
+        '''Load a single component's configuration to the setup'''
+        component_dir = self.setup_dir / (component_name+'/')
         component_dir.mkdir(parents=True,exist_ok=True)
         
         cal_dirs = [f for f in component_dir.iterdir() if (f.is_dir() and str(f.name).isdigit())]
@@ -96,7 +96,7 @@ class Workspace:
         if imports_ros and rosgraph.is_master_online() and ros_param_ns is not None:
             try: 
                 if ros_param_ns == 'default':
-                    ros_param_ns = f'/{self.machine}/{component_name}'
+                    ros_param_ns = f'/{self.setup}/{component_name}'
                 rospy.set_param(ros_param_ns,json.loads(json.dumps(self.cfg[component_name]))) 
                 # json recursively converts ordereddict to dict
             except Exception as ex: 
@@ -105,8 +105,8 @@ class Workspace:
         self.cfg[component_name] = load_to_dict(self.cfg[component_name],cfg_dir)
 
     def load_component_cal(self, component_name: str, run_time_epoch: int = None, ros_param_ns: str = None, default_cfg: str = None):
-        '''Load a single component's calibration to the machine workspace'''
-        component_dir = self.machine_dir / component_name
+        '''Load a single component's calibration to the setup'''
+        component_dir = self.setup_dir / component_name
         component_dir.mkdir(parents=True,exist_ok=True)
         cal_dirs = [f for f in component_dir.iterdir() if (f.is_dir() and str(f.name).isdigit())]
         if run_time_epoch != None and len(cal_dirs) > 0:
@@ -136,7 +136,7 @@ class Workspace:
         if imports_ros and rosgraph.is_master_online() and ros_param_ns is not None:
             try: 
                 if ros_param_ns == 'default':
-                    ros_param_ns = f'/{self.machine}/{component_name}'
+                    ros_param_ns = f'/{self.setup}/{component_name}'
                 rospy.set_param(ros_param_ns,json.loads(json.dumps(self.cal[component_name])))
             except Exception as ex: 
                 logging.warning(f'failed to set ros params: {ex}')
@@ -145,7 +145,7 @@ class Workspace:
 
     def save_component_cfg(self, component_name: str, configuration: dict):
         '''Save a configuration for a single component - overwrites prior'''
-        cfg_dir = self.machine_dir / component_name / 'cfg/'
+        cfg_dir = self.setup_dir / component_name / 'cfg/'
         cfg_dir.mkdir(parents=True,exist_ok=True)
 
         configuration = save_from_dict(configuration,cfg_dir)
@@ -164,7 +164,7 @@ class Workspace:
             logging.debug(f'overwriting cal {cal_dir}')
         else: # new cal
             cal_time = str(int(time.time()))
-            cal_dir = self.machine_dir / component_name / cal_time
+            cal_dir = self.setup_dir / component_name / cal_time
             cal_dir.mkdir(parents=True,exist_ok=True)
             self.paths[component_name]['cal'] = cal_dir
             logging.debug(f'creating new cal {cal_dir}')
@@ -216,7 +216,7 @@ def save_from_dict(d:dict,dir:pathlib.Path,file_ns:str=''):
     for k,v in d.items():
         if isinstance(v,pd.DataFrame):
             d[k] = file_ns+k+'.csv' # replaces key with csv path
-            v.to_csv(str(dir / d[k])+'.csv')
+            v.to_csv(str(dir / d[k]))
 
         elif isinstance(v,np.ndarray):
             d[k] = file_ns+k+'.npy' # replaces key with npy path
@@ -230,8 +230,8 @@ def save_from_dict(d:dict,dir:pathlib.Path,file_ns:str=''):
     return d
 
 if __name__ == "__main__":
-    ws = Workspace('test_machine')
-    ws.save_example_cal()
+    setup = Setup('test_machine')
+    setup.save_example_cal()
 
     testcal = {
             'test_param_A':1,
@@ -244,12 +244,7 @@ if __name__ == "__main__":
                 }
             }
         }
-    ws.save_component_cal('example_component',testcal)
-    ws.load()
+    setup.save_component_cal('example_component',testcal)
+    setup.load()
     time.sleep(2)
-    ws.save_component_cal('example_component',ws.cal['example_component'])
-
-'''
-TODO:
-- when instantiating a component for the first time (loading from default_cfg), run a prompt to get the user input?
-'''
+    setup.save_component_cal('example_component',setup.cal['example_component'])
