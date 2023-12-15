@@ -3,7 +3,7 @@ from distutils.core import setup
 try: # Modified so setuptools can build a pip version
     from catkin_pkg.python_setup import generate_distutils_setup
     d = generate_distutils_setup(
-        packages=['calibration_manager.py'],
+        packages=['calibration_manager'],
         package_dir={'': 'src'}
     )
 except:

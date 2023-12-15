@@ -27,10 +27,11 @@ class Setup:
     or a stored backup of the calibration ({build_name}/SCOPS/cal/)
     """
     def __init__(self, setup: str, setup_storage: str = '~/.ros/setups/'):
-        self.setup = setup
+        self.setup = setup.strip('/')
         self.setup_storage = pathlib.Path(setup_storage)
         self.setup_storage = self.setup_storage.expanduser()
-        self.setup_dir = self.setup_storage / self.setup
+        self.setup_dir = self.setup_storage / (self.setup+'/')
+        logging.info(f'setup_dir: {self.setup_dir}')
         
         self.cfg = {}
         self.cal = {}
@@ -62,7 +63,8 @@ class Setup:
 
     def load_component_cfg(self, component_name: str, run_time_epoch: int = None, ros_param_ns: str = None, default_cfg: str = None):
         '''Load a single component's configuration to the setup'''
-        component_dir = self.setup_dir / (component_name+'/')
+        component_filename = component_name.strip('/').replace('/','+')+'/'
+        component_dir = self.setup_dir / component_filename
         component_dir.mkdir(parents=True,exist_ok=True)
         
         cal_dirs = [f for f in component_dir.iterdir() if (f.is_dir() and str(f.name).isdigit())]
@@ -106,7 +108,8 @@ class Setup:
 
     def load_component_cal(self, component_name: str, run_time_epoch: int = None, ros_param_ns: str = None, default_cfg: str = None):
         '''Load a single component's calibration to the setup'''
-        component_dir = self.setup_dir / component_name
+        component_filename = component_name.strip('/').replace('/','+')+'/'
+        component_dir = self.setup_dir / component_filename
         component_dir.mkdir(parents=True,exist_ok=True)
         cal_dirs = [f for f in component_dir.iterdir() if (f.is_dir() and str(f.name).isdigit())]
         if run_time_epoch != None and len(cal_dirs) > 0:
@@ -145,7 +148,8 @@ class Setup:
 
     def save_component_cfg(self, component_name: str, configuration: dict):
         '''Save a configuration for a single component - overwrites prior'''
-        cfg_dir = self.setup_dir / component_name / 'cfg/'
+        component_filename = component_name.strip('/').replace('/','+')
+        cfg_dir = self.setup_dir / component_filename / 'cfg/'
         cfg_dir.mkdir(parents=True,exist_ok=True)
 
         configuration = save_from_dict(configuration,cfg_dir)
@@ -155,7 +159,7 @@ class Setup:
 
     def save_component_cal(self, component_name: str, calibration: dict, overwrite: bool = False):
         '''Write calibration for a single component'''
-        print(self.paths)
+        component_filename = component_name.strip('/').replace('/','+')
         if component_name not in self.paths:
             self.paths[component_name] = {}
         if overwrite and 'cal' in self.paths[component_name]:
@@ -164,7 +168,8 @@ class Setup:
             logging.debug(f'overwriting cal {cal_dir}')
         else: # new cal
             cal_time = str(int(time.time()))
-            cal_dir = self.setup_dir / component_name / cal_time
+            cmp_dir = self.setup_dir / component_filename 
+            cal_dir = cmp_dir / cal_time
             cal_dir.mkdir(parents=True,exist_ok=True)
             self.paths[component_name]['cal'] = cal_dir
             logging.debug(f'creating new cal {cal_dir}')
@@ -173,7 +178,7 @@ class Setup:
         calibration = save_from_dict(calibration,cal_dir)
 
         yaml.dump(calibration, cal_dir / 'cal.yaml')
-        if 'cfg' in self.paths[component_name]:
+        if 'cfg' in self.paths[component_name] and self.paths[component_name]['cfg'] not in [cal_dir]:
             shutil.copytree(self.paths[component_name]['cfg'],cal_dir,dirs_exist_ok=True)
         logging.debug(f'calibration written to {cal_dir}')
 
