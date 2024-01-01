@@ -21,21 +21,27 @@ class Setup:
     
     Each machine setup has any number of named components, which store a current configuration, and a
     timeline history of calibrations (with the config at time of calibration)
-
+    
+    setup_dir: str path to setup folder, if None tries setup_storage + setup 
+    setup: str name of the selected setup
     setup_storage: str path to either the current machine setup storage location 
     (~/.ros/setups/, /networkdrive/setups/, etc), 
     or a stored backup of the calibration ({build_name}/SCOPS/cal/)
+
+    Leave constructor arguments blank to attempt to find the currently selected setup
     """
-    def __init__(self, setup: str, setup_storage: str = '~/.ros/setups/'):
-        self.setup = setup.strip('/')
-        self.setup_storage = pathlib.Path(setup_storage)
-        self.setup_storage = self.setup_storage.expanduser()
-        self.setup_dir = self.setup_storage / (self.setup+'/')
-        logging.info(f'setup_dir: {self.setup_dir}')
-        
+    def __init__(self, setup_dir: str = '~/.ros/setups/selected_setup/'):
+        if setup_dir is not None:
+            self.set_setup_dir(setup_dir)
+
+    def set_setup_dir(self, setup_dir):
         self.cfg = {}
         self.cal = {}
         self.paths = {}
+
+        self.setup_dir = pathlib.Path(setup_dir).expanduser().resolve()
+        self.setup_name = str(self.setup_dir.name)
+        logging.info(f'opened setup_dir: {self.setup_dir}')
 
     def load(self, run_time_epoch: int = None, ros_param_ns: str = None):
         '''Loads all component configurations & calibrations of a machine setup
@@ -63,7 +69,7 @@ class Setup:
 
     def load_component_cfg(self, component_name: str, run_time_epoch: int = None, ros_param_ns: str = None, default_cfg: str = None):
         '''Load a single component's configuration to the setup'''
-        component_filename = component_name.strip('/').replace('/','+')+'/'
+        component_filename = component_name.strip('/')+'/'
         component_dir = self.setup_dir / component_filename
         component_dir.mkdir(parents=True,exist_ok=True)
         
@@ -98,7 +104,7 @@ class Setup:
         if imports_ros and rosgraph.is_master_online() and ros_param_ns is not None:
             try: 
                 if ros_param_ns == 'default':
-                    ros_param_ns = f'/{self.setup}/{component_name}'
+                    ros_param_ns = f'/{self.setup_name}/{component_name}'
                 rospy.set_param(ros_param_ns,json.loads(json.dumps(self.cfg[component_name]))) 
                 # json recursively converts ordereddict to dict
             except Exception as ex: 
@@ -139,7 +145,7 @@ class Setup:
         if imports_ros and rosgraph.is_master_online() and ros_param_ns is not None:
             try: 
                 if ros_param_ns == 'default':
-                    ros_param_ns = f'/{self.setup}/{component_name}'
+                    ros_param_ns = f'/{self.setup_name}/{component_name}'
                 rospy.set_param(ros_param_ns,json.loads(json.dumps(self.cal[component_name])))
             except Exception as ex: 
                 logging.warning(f'failed to set ros params: {ex}')
@@ -233,6 +239,41 @@ def save_from_dict(d:dict,dir:pathlib.Path,file_ns:str=''):
         elif isinstance(v, dict): # recurses
             d[k] = save_from_dict(v,dir,file_ns+str(k)+'+')
     return d
+
+def set_setup_storage(path: str):
+    '''Reroutes setup storage location'''
+    setup_storage_path = pathlib.Path(path).expanduser()
+    if setup_storage_path.exists():
+        setup_dir_link = pathlib.Path('~/.ros/setups/').expanduser()
+        
+        setup_dir_link.unlink(missing_ok=True)
+        setup_dir_link.symlink_to(setup_storage_path,target_is_directory=True)
+    else:
+        raise NotADirectoryError('Specified storage path does not exist')
+    
+def new_setup(setup_name: str):
+    '''create a new setup directory'''
+    setup_path = pathlib.Path('~/.ros/setups/').expanduser() / setup_name
+    if setup_path.exists():
+        raise FileExistsError('setup already exists, choose a unique name')
+    setup_path.mkdir(parents=True)
+    return setup_path
+
+def list_setups():
+    '''Return available setups in set storage directory'''
+    setup_storage = pathlib.Path('~/.ros/setups/').expanduser()
+    setup_names = [d.name for d in setup_storage.iterdir() if d.is_dir()]
+    return setup_names
+
+def select_setup(setup_name: str):
+    '''Select setup (leaves selected_setup text pointer in setup storage)'''
+    setup_path = pathlib.Path('~/.ros/setups/').expanduser() / setup_name
+    if not setup_path.exists():
+        raise FileNotFoundError('Setup not found')
+
+    selected_path = pathlib.Path('~/.ros/setups/').expanduser() / 'selected_setup'
+    selected_path.unlink(missing_ok=True)
+    selected_path.write_text(f'{setup_name}')
 
 if __name__ == "__main__":
     setup = Setup('test_machine')
