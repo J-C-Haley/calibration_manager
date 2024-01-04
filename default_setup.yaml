@@ -1,0 +1,5 @@
+# Copy this to your package, overwrite, and set the /default_setup_pkg param to set a new default setup
+components: ~
+data_storage_local: /data
+data_storage_deep: /deepdata
+topics: ~

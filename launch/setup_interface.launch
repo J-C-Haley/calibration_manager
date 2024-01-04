@@ -1,0 +1,14 @@
+<launch>
+<!-- Example launchfile for scops, to be copied to a machine package and modified for specifics (search XXX)-->
+
+<!-- Recording dashboard -->
+<node name = "setup_interface" pkg = "rqt_gui" type = "rqt_gui" 
+    respawn = "false" output = "screen" 
+    args = "--perspective-file $(find calibration_manager)/config/interface.perspective">
+</node>
+
+<!-- driver launch, if is setup -->
+<arg name="drivers_exist" value="$(eval '1' if eval('_' + '_import_' + '_(\'pathlib\')').Path('~/.ros/setups/selected_setup/drivers.launch').expanduser().exists() else '0')"/>
+<include file="$(env HOME)/.ros/setups/selected_setup/drivers.launch" if="$(arg drivers_exist)"/>
+
+</launch>

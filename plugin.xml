@@ -1,0 +1,16 @@
+<library path="src">
+    <class name="Setup Manager" type="calibration_manager.rqt_setup_manager.SetupManager" base_class_type="rqt_gui_py::Plugin">
+    <description>
+      ROS RQT plugin for managing machine setup, configuration, and calibration without launch files
+    </description>
+    <qtgui>
+      optional grouping...
+      <group>
+        <label>Configuration</label>
+      </group>
+      <label>Machine Setup2</label>
+      <icon type="theme">system-help</icon>
+      <statustip>Manage machine component setup, configuration, and calibration</statustip>
+    </qtgui>
+  </class>
+</library>

@@ -1,0 +1,10 @@
+#!/usr/bin/env python3
+
+import sys
+
+from calibratation_manager.rqt_setup_manager import SetupManager
+from rqt_gui.main import Main
+
+plugin = 'rqt_setup_manager'
+main = Main(filename=plugin)
+sys.exit(main.main(standalone=plugin))

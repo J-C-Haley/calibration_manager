@@ -1,0 +1,4 @@
+
+<!-- Copy this to your package, overwrite, and set the /default_setup_pkg param to set a new default setup -->
+<launch>
+</launch>
