@@ -4,7 +4,7 @@
 <!-- Recording dashboard -->
 <node name = "setup_interface" pkg = "rqt_gui" type = "rqt_gui" 
     respawn = "false" output = "screen" 
-    args = "--perspective-file $(find calibration_manager)/config/interface.perspective">
+    args = "--perspective-file $(find calibration_manager)/resource/interface.perspective">
 </node>
 
 <!-- driver launch, if is setup -->

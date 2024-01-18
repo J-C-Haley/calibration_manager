@@ -55,3 +55,6 @@ Future features planned:
 - allow datetime loading
 
 Suggestions and commits are welcome.
+
+TODO:
+- fix pypi generation and migrate to foxy... unless I can get it to build in both?

@@ -4,11 +4,10 @@
       ROS RQT plugin for managing machine setup, configuration, and calibration without launch files
     </description>
     <qtgui>
-      optional grouping...
       <group>
         <label>Configuration</label>
       </group>
-      <label>Machine Setup2</label>
+      <label>Machine Setup</label>
       <icon type="theme">system-help</icon>
       <statustip>Manage machine component setup, configuration, and calibration</statustip>
     </qtgui>

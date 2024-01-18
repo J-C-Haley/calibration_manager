@@ -10,6 +10,13 @@ from typing import OrderedDict
 from ruamel.yaml import YAML
 yaml = YAML()
 
+# ROS2
+# import rclpy
+# from ament_index_python.packages import get_packages_with_prefixes
+# from ros2launch.api.api import get_launch_file_paths
+# from launch.launch_description_sources import get_launch_description_from_any_launch_file
+
+# ROS1
 import rospy
 import rospkg
 rospack = rospkg.RosPack()
@@ -41,7 +48,7 @@ class SetupManager(Plugin):
 
         ### Create QWidget
         self._widget = QWidget()
-        ui_file = os.path.join(rospack.get_path('calibration_manager'), 'config', 'SetupManager.ui')
+        ui_file = os.path.join(rospack.get_path('calibration_manager'), 'resource', 'SetupManager.ui')
         loadUi(ui_file, self._widget)
         self._widget.setObjectName('SetupManagerUi')
         if context.serial_number() > 1:
@@ -207,8 +214,19 @@ class SetupManager(Plugin):
 
     def list_components(self):
         '''Find all launch files eligible to be added as components'''
-        pkg_list = rospack.list()
-        pkg_paths = [pathlib.Path(rospack.get_path(pkg)) for pkg in pkg_list]
+        # pkg_list = get_packages_with_prefixes()
+        # pkg_paths = [pathlib.Path(rospack.get_path(pkg)) for pkg in pkg_list.keys()]
+
+        # self.launches = {}
+        # for pkg_name, pkg_path in pkg_list.items():
+        #     launch_paths = get_launch_file_paths(pkg_path)
+        #     for lp in launch_paths:
+        #         self.launches[lp] = {}
+        #         self.launches[lp]['launch_name'] = str(lp).rsplit('/',1)[0].split('.',1)[0]
+        #         self.launches[lp]['launch_package_name'] = pkg_name
+        #         self.launches[lp]['launch_package_path'] = pkg_path
+        #         self.launches[lp]['launch_description'] = get_launch_description_from_any_launch_file(lp)
+        #         self.launches[lp]['launch_arguments'] = self.launches[lp]['launch_description'].get_launch_arguments()
         
         self.launch_files_info = []
         for pkg, pth in zip(pkg_list,pkg_paths):
@@ -310,6 +328,7 @@ class SetupManager(Plugin):
         if component_name is None:
             return
         
+        # TODO: self.launches replaces
         launch_file_info = [lf for lf in self.launch_files_info if lf['launch_path'] in str(component_path)][0]
         component_package = launch_file_info['package']
 
