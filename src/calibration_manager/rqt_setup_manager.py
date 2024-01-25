@@ -319,7 +319,7 @@ class SetupManager(Plugin):
 
         matches = []
         for existing_cmp_name in existing_cmp_names:
-            m = re.match(f'^{component_name}(\d*)',existing_cmp_name)
+            m = re.match(f'^{component_name}(\d*)$',existing_cmp_name)
             if m is not None:
                 matches.append(int(m[1]))
         if len(matches) > 0:
