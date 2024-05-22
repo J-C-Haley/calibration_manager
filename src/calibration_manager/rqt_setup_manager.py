@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
 from lxml import etree
-import numpy as np
 import os
 import pathlib
 import re
 import shutil
 import subprocess
-from typing import OrderedDict
 from ruamel.yaml import YAML
 yaml = YAML()
 
@@ -20,11 +18,8 @@ bridge = CvBridge()
 
 from qt_gui.plugin import Plugin
 from python_qt_binding import loadUi
-from python_qt_binding.QtWidgets import QWidget, QFileDialog
-from qt_gui_py_common.simple_settings_dialog import SimpleSettingsDialog
-from PyQt5.QtCore import QSettings, Qt, pyqtSignal, pyqtSlot, QModelIndex, QEvent
-from PyQt5.QtGui import QTextCursor, QPixmap, QBrush, QColor
-from PyQt5.QtWidgets import QApplication, QTreeView, QTreeWidget, QTreeWidgetItem, QCompleter, QLineEdit, QComboBox, QMenu
+from python_qt_binding.QtCore import QSettings, Qt, QEvent
+from python_qt_binding.QtWidgets import QWidget, QTreeWidgetItem, QCompleter, QComboBox, QMenu
 
 import tkinter as tk
 from tkinter import filedialog, simpledialog, messagebox
