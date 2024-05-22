@@ -22,13 +22,12 @@ from qt_gui.plugin import Plugin
 from python_qt_binding import loadUi
 from python_qt_binding.QtWidgets import QWidget, QFileDialog
 from qt_gui_py_common.simple_settings_dialog import SimpleSettingsDialog
-from PyQt5.QtCore import QSettings, Qt, pyqtSignal, pyqtSlot, QModelIndex
+from PyQt5.QtCore import QSettings, Qt, pyqtSignal, pyqtSlot, QModelIndex, QEvent
 from PyQt5.QtGui import QTextCursor, QPixmap, QBrush, QColor
 from PyQt5.QtWidgets import QApplication, QTreeView, QTreeWidget, QTreeWidgetItem, QCompleter, QLineEdit, QComboBox, QMenu
 
 import tkinter as tk
-from tkinter import filedialog, simpledialog
-from tkinter.messagebox import askyesno
+from tkinter import filedialog, simpledialog, messagebox
 root = tk.Tk()
 root.withdraw()
 
@@ -54,9 +53,9 @@ class SetupManager(Plugin):
         ### Set up gui connections
         self._widget.setupStorageLineEdit.returnPressed.connect(self.set_setup_storage)
         self._widget.selectSetupStoragePushButton.clicked.connect(self.find_setup_storage)
-        self._widget.setupNsLineEdit.returnPressed.connect(self.set_setup_ns)
+        self._widget.setupNsComboBox.installEventFilter(self)
+        self._widget.setupNsComboBox.activated.connect(self.set_setup_from_box)
         self._widget.newSetupPushButton.clicked.connect(self.new_setup)
-        self._widget.loadSetupPushButton.clicked.connect(self.find_setup) # TODO: just make a combobox...
         self._widget.localDataStorageLineEdit.textChanged.connect(self.set_data_storage_local)
         self._widget.deepDataStorageLineEdit.textChanged.connect(self.set_data_storage_deep)
         self._widget.runDriversPushButton.clicked.connect(self.run_drivers)
@@ -87,12 +86,12 @@ class SetupManager(Plugin):
         ### Initialize defaut setup from /default_setup_pkg on first run
         setup_path = pathlib.Path(self.setup_storage).expanduser() / self.setup_ns
         if not setup_path.exists():
-            self.new_setup()
+            self.new_setup(os.environ.get('ROS_SETUP'))
+        self.init_setup_combobox()
 
     def save_settings(self, plugin_settings, instance_settings):
         '''Save ui configuration'''
         self.settings.setValue('setup_storage',self.setup_storage)
-        self.settings.setValue('setup_ns',self.setup_ns)
         self.settings.setValue('data_storage_local',self.data_storage_local)
         self.settings.setValue('data_storage_deep',self.data_storage_deep)
 
@@ -105,13 +104,11 @@ class SetupManager(Plugin):
             self._widget.setupStorageLineEdit.setText(self.setup_storage)
             self.set_setup_storage()
 
-        if rospy.has_param('/setup_selected'):
-            self.setup_ns = rospy.get_param('/setup_selected')
-        else:
-            self.setup_ns = self.settings.value('setup_ns', 'default_setup') # TODO: make these combo box dropdowns
-
-        self._widget.setupNsLineEdit.setText(self.setup_ns)
-        self.set_setup_ns()
+        self.setup_ns = os.environ.get('ROS_SETUP')
+        if self.setup_ns is None:
+            self.setup_ns = 'default_setup'
+            os.environ['ROS_SETUP'] = self.setup_ns
+        self.set_setup_ns(self.setup_ns)
 
         self.data_storage_local = self.settings.value('data_storage_local', '')
         if self.data_storage_local != '':
@@ -139,63 +136,69 @@ class SetupManager(Plugin):
             setup_dir_link.unlink(missing_ok=True)
             setup_dir_link.symlink_to(setup_storage_path,target_is_directory=True)
 
-            rospy.set_param('/setup_storage',self.setup_storage)
             self._widget.setupStorageLineEdit.setStyleSheet("color: green;")
         else:
             self._widget.setupStorageLineEdit.setStyleSheet("color: red;")
 
         self.setup_ns = None
-        self._widget.setupNsLineEdit.setText(self.setup_ns)
+        # self._widget.setupNsLineEdit.setText(self.setup_ns)
+    
+    def init_setup_combobox(self):
+        self.fill_setup_combo_box()
+        selected = os.environ.get('ROS_SETUP')
+        if selected is not None and selected in self.setup_names:
+            self._widget.setupNsComboBox.setCurrentText(selected)
 
-    def new_setup(self):
-        '''create a new setup directory'''
-        setup_ns = self._widget.setupNsLineEdit.text()
+    def eventFilter(self, target, event):
+        if target == self._widget.setupNsComboBox and event.type() == QEvent.MouseButtonPress:
+            self.fill_setup_combo_box()
+        return False
+    
+    def fill_setup_combo_box(self):
+        setup_names = [str(f.name) for f in pathlib.Path(self.setup_storage).expanduser().iterdir() \
+                if f.is_dir() \
+                and (f/'setup.yaml').exists() \
+                and not os.path.islink(f)]
+        if hasattr(self,'setup_names') and setup_names == self.setup_names:
+            return
+        self.setup_names = setup_names
+        self._widget.setupNsComboBox.clear()
+        self._widget.setupNsComboBox.addItems(self.setup_names)
+
+    def set_setup_from_box(self, index):
+        self.set_setup_ns(self.setup_names[index])
+
+    def set_setup_ns(self, setup_ns):
         setup_path = pathlib.Path(self.setup_storage).expanduser() / setup_ns
+        if not setup_path.exists():
+            rospy.logerr(f'Selected setup does not exist: {setup_path}')
+            return
+        self.setup_ns = setup_ns
+        os.environ['ROS_SETUP'] = self.setup_ns
+        self._widget.setupNsComboBox.setCurrentText(self.setup_ns) 
+        self.load_setup_to_trees(setup_path)
+
+    def new_setup(self, setup_name=None):
+        '''create a new setup'''
+        # TODO: make new setups from TEMPLATES or COPY existing setup format
+        # setup_ns = self._widget.setupNsLineEdit.text()
+        if setup_name is None or not isinstance(setup_name, str):
+            setup_name = simpledialog.askstring("Input", "New unique setup name (convention is: {machine/cell}_{pchostname})")
+        setup_path = pathlib.Path(self.setup_storage).expanduser() / setup_name
         if setup_path.exists():
-            rospy.logerr('setup already exists, choose a unique name')
+            rospy.logerr('Setup already exists, choose a unique name')
+            messagebox.showerror("Error", "Setup already exists, choose a unique name")
             return
         setup_path.mkdir(exist_ok=True,parents=True)
 
         # need to guaruntee existence of setup.yaml and drivers.yaml; 
-        # so we're providing blank templates that can be overwritten by other versions (see scops_base)
+        # so we're providing blank templates that can be overwritten
         default_setup_pkg = rospy.get_param('/default_setup_pkg','calibration_manager')
         default_setup_pkg = pathlib.Path(rospack.get_path(default_setup_pkg)).expanduser()
         shutil.copy(default_setup_pkg/'default_setup.yaml',setup_path/'setup.yaml')
         shutil.copy(default_setup_pkg/'default_drivers.launch',setup_path/'drivers.launch')
 
-        # setup is loaded into object via set_setup_ns > load_setup > add_component_to_tree / load_topic
-        self.set_setup_ns(setup_ns=setup_ns)
-
-    def find_setup(self):
-        setup_dir = filedialog.askdirectory(initialdir=self.setup_storage)
-        if setup_dir is not None:
-            setup_ns = str(pathlib.Path(setup_dir).name)
-            self._widget.setupNsLineEdit.setText(setup_ns)
-            self.set_setup_ns(setup_ns=setup_ns)
-
-    def set_setup_ns(self, setup_ns=None):
-        if setup_ns is None or type(setup_ns) == Bool:
-            setup_ns = self._widget.setupNsLineEdit.text()
-        else:
-            self._widget.setupNsLineEdit.setText(setup_ns)
-
-        setup_path = pathlib.Path(self.setup_storage).expanduser() / setup_ns
-        if not setup_path.exists():
-            self._widget.setupNsLineEdit.setStyleSheet("color: red;")
-            return
-        
-        self.setup_ns = setup_ns
-
-        selected_setup_path = pathlib.Path(self.setup_storage).expanduser() / 'selected_setup'
-        selected_setup_path.unlink(missing_ok=True)
-        selected_setup_path.symlink_to(setup_path,target_is_directory=True)
-
-        rospy.set_param('/setup_selected',setup_ns)
-        # can either find the setup dir through the symlink or with the ros_param
-
-        self._widget.setupNsLineEdit.setStyleSheet("color: green;")
-
-        self.load_setup(setup_path)
+        self.set_setup_ns(setup_ns=setup_name) # TODO not working?
 
     def set_data_storage_local(self):
         self.data_storage_local = self._widget.localDataStorageLineEdit.text()
@@ -221,7 +224,7 @@ class SetupManager(Plugin):
                     'launch_path':lf
                     })
 
-    def load_setup(self,setup_path):
+    def load_setup_to_trees(self,setup_path):
         '''Parse prior setup and construct a param tree'''
         self._widget.componentTreeWidget.clear()
         self._widget.topicTreeWidget.clear()
@@ -319,7 +322,7 @@ class SetupManager(Plugin):
 
         matches = []
         for existing_cmp_name in existing_cmp_names:
-            m = re.match(f'^{component_name}(\d*)$',existing_cmp_name)
+            m = re.match(f'^{component_name}(\d*)',existing_cmp_name)
             if m is not None:
                 matches.append(int(m[1]))
         if len(matches) > 0:
@@ -551,12 +554,14 @@ class SetupManager(Plugin):
 
         # write drivers.launch
         launchroot = etree.Element("launch")
+        setup_group = etree.SubElement(launchroot, "group")
+        setup_group.attrib['ns'] = '/'+self.setup_ns
         for cmp in self.setup['components']:
             if cmp['component_type'] != 'driver':
                 continue
             if not cmp['enabled']:
                 continue
-            grp_child = etree.SubElement(launchroot, "group")
+            grp_child = etree.SubElement(setup_group, "group")
             grp_child.attrib['ns'] = cmp['group_name']
             cmp_child = etree.SubElement(grp_child, "include")
             cmp_child.attrib['file'] = cmp['component_launch_file']
