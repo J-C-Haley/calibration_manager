@@ -78,7 +78,7 @@ class SetupManager(Plugin):
 
         self._widget.savePushButton.clicked.connect(self.save_setup)
 
-        ### Initialize defaut setup from /default_setup_pkg on first run
+        ### Initialize defaut setup from /setup_template_pkg on first run
         setup_path = pathlib.Path(self.setup_storage).expanduser() / self.setup_ns
         if not setup_path.exists():
             self.new_setup(os.environ.get('ROS_SETUP'))
@@ -170,10 +170,17 @@ class SetupManager(Plugin):
             return
         self.setup_ns = setup_ns
         os.environ['ROS_SETUP'] = self.setup_ns
-        self._widget.setupNsComboBox.setCurrentText(self.setup_ns) 
+        self._widget.setupNsComboBox.setCurrentText(self.setup_ns)
+
+        # make symlink for deterministic path
+        ### TODO: remove this??? Doesn't work on shared setup storage
+        selected_setup_path = pathlib.Path(self.setup_storage).expanduser() / 'selected_setup'
+        selected_setup_path.unlink(missing_ok=True)
+        selected_setup_path.symlink_to(setup_path,target_is_directory=True)
+        ###
         self.load_setup_to_trees(setup_path)
 
-    def new_setup(self, setup_name=None):
+    def new_setup(self, setup_name=None, setup_template_pkg=None):
         '''create a new setup'''
         # TODO: make new setups from TEMPLATES or COPY existing setup format
         # setup_ns = self._widget.setupNsLineEdit.text()
@@ -186,22 +193,25 @@ class SetupManager(Plugin):
             return
         setup_path.mkdir(exist_ok=True,parents=True)
 
-        # need to guaruntee existence of setup.yaml and drivers.yaml; 
-        # so we're providing blank templates that can be overwritten
-        default_setup_pkg = rospy.get_param('/default_setup_pkg','calibration_manager')
-        default_setup_pkg = pathlib.Path(rospack.get_path(default_setup_pkg)).expanduser()
-        shutil.copy(default_setup_pkg/'default_setup.yaml',setup_path/'setup.yaml')
-        shutil.copy(default_setup_pkg/'default_drivers.launch',setup_path/'drivers.launch')
+        # Copy setup template 
+        if setup_template_pkg is None:
+            setup_template_pkg = os.environ.get('ROS_SETUP_TEMPLATE','calibration_manager')
+        setup_template_pkg = pathlib.Path(rospack.get_path(setup_template_pkg)).expanduser()
+        shutil.copy(setup_template_pkg/'default_setup.yaml',setup_path/'setup.yaml')
+        with open(setup_path/'setup.yaml', 'r') as file:
+            filedata = file.read()
+        filedata = filedata.replace('$(env ROS_SETUP)', os.environ.get('ROS_SETUP'))
+        with open(setup_path/'setup.yaml', 'w') as file:
+            file.write(filedata)
 
         self.set_setup_ns(setup_ns=setup_name) # TODO not working?
+        self.save_setup()
 
     def set_data_storage_local(self):
         self.data_storage_local = self._widget.localDataStorageLineEdit.text()
-        rospy.set_param('/data_storage_local',self.data_storage_local)
 
     def set_data_storage_deep(self):
         self.data_storage_deep = self._widget.deepDataStorageLineEdit.text()
-        rospy.set_param('/data_storage_deep',self.data_storage_deep)
 
     def list_components(self):
         '''Find all launch files eligible to be added as components'''
@@ -310,6 +320,7 @@ class SetupManager(Plugin):
         
         launch_file_info = [lf for lf in self.launch_files_info if lf['launch_path'] in str(component_path)][0]
         component_package = launch_file_info['package']
+        component_relative_path = pathlib.Path(*list(component_path.parts[component_path.parts.index(component_package)+1:]))
 
         # existing_cmp_names = [key for key in self.setup['components']]
         existing_cmp_names = [self._widget.componentTreeWidget.topLevelItem(i).data(0,0)
@@ -330,7 +341,7 @@ class SetupManager(Plugin):
             'group_name': '/',
             'component_package': component_package,
             'component_type': 'driver', # driver, service, or routine
-            'component_launch_file':str(component_path),
+            'component_launch_file':str(component_relative_path),
             'enabled': True,
             'args':{}
             }
@@ -385,18 +396,22 @@ class SetupManager(Plugin):
             elif node.data(2,0) == 'ros_param':
                 pass
 
-        launchroot = etree.Element("launch")
-        grp_child = etree.SubElement(launchroot, "group")
-        grp_child.attrib['ns'] = cmp['group_name']
-        cmp_child = etree.SubElement(grp_child, "include")
-        cmp_child.attrib['file'] = cmp['component_launch_file']
+        root = etree.Element("launch")
+        el = root
+        el = etree.SubElement(el, "group") # TODO: make setup_ns group optional?
+        el.attrib['ns'] = self.setup_ns 
+        if 'group_name' in cmp and not (cmp['group_name'] is None or cmp['group_name']==""):
+            el = etree.SubElement(el, "group")
+            el.attrib['ns'] = cmp['group_name']
+        cmp_child = etree.SubElement(el, "include")
+        cmp_child.attrib['file'] = f"$(find {cmp['component_package']})/{cmp['component_launch_file']}"
 
         for arg_name, arg_val in cmp['args'].items():
             arg_child = etree.SubElement(cmp_child, "arg")
             arg_child.attrib['name'] = arg_name
             arg_child.attrib['default'] = arg_val
             
-        et = etree.ElementTree(launchroot)
+        et = etree.ElementTree(root)
         launch_path = str(pathlib.Path(self.setup_storage).expanduser() / self.setup_ns / 'temp_routine.launch')
         et.write(launch_path, pretty_print=True)
 
@@ -548,25 +563,30 @@ class SetupManager(Plugin):
         setup_dir = pathlib.Path(self.setup_storage).expanduser() / self.setup_ns
 
         # write drivers.launch
-        launchroot = etree.Element("launch")
-        setup_group = etree.SubElement(launchroot, "group")
-        setup_group.attrib['ns'] = '/'+self.setup_ns
+        root = etree.Element("launch")
+        el = root
+        # setup_el = etree.SubElement(el, "group") # TODO: make setup_ns grouping optional
+        # setup_el.attrib['ns'] = self.setup_ns
+        # el = setup_el
         for cmp in self.setup['components']:
             if cmp['component_type'] != 'driver':
                 continue
             if not cmp['enabled']:
                 continue
-            grp_child = etree.SubElement(setup_group, "group")
-            grp_child.attrib['ns'] = cmp['group_name']
-            cmp_child = etree.SubElement(grp_child, "include")
-            cmp_child.attrib['file'] = cmp['component_launch_file']
+            
+            if 'group_name' in cmp and not (cmp['group_name'] is None or cmp['group_name']==""):
+                print(cmp['group_name'],flush=True)
+                el = etree.SubElement(root, "group")
+                el.attrib['ns'] = cmp['group_name']
+            cmp_child = etree.SubElement(el, "include")
+            cmp_child.attrib['file'] = f"$(find {cmp['component_package']})/{cmp['component_launch_file']}"
 
             for arg_name, arg_val in cmp['args'].items():
                 arg_child = etree.SubElement(cmp_child, "arg")
                 arg_child.attrib['name'] = arg_name
                 arg_child.attrib['default'] = arg_val
                
-        et = etree.ElementTree(launchroot)
+        et = etree.ElementTree(root)
         et.write(str(setup_dir / 'drivers.launch'), pretty_print=True)
 
         # TODO: write services launch? Start services?
@@ -594,18 +614,6 @@ class SetupManager(Plugin):
                 grp['topics'].append(tpc)
 
             self.setup['bags'].append(grp)
-
-# '''
-# bags:
-#   - group_name: LOGGING
-#     end_delay: 0.0
-#     topics:
-#       - topic_name: /rosout
-#         enabled: true
-#       - topic_name: /rosout_agg
-#         enabled: true
-        
-#         '''
 
         yaml.dump(self.setup, pathlib.Path(self.setup_storage).expanduser() / self.setup_ns / 'setup.yaml')
 
