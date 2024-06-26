@@ -398,8 +398,8 @@ class SetupManager(Plugin):
 
         root = etree.Element("launch")
         el = root
-        el = etree.SubElement(el, "group") # TODO: make setup_ns group optional?
-        el.attrib['ns'] = self.setup_ns 
+        # el = etree.SubElement(el, "group") # TODO: make setup_ns group optional?
+        # el.attrib['ns'] = self.setup_ns 
         if 'group_name' in cmp and not (cmp['group_name'] is None or cmp['group_name']==""):
             el = etree.SubElement(el, "group")
             el.attrib['ns'] = cmp['group_name']
