@@ -180,6 +180,11 @@ class Setup:
             self.paths[component_name]['cal'] = cal_dir
             logging.debug(f'creating new cal {cal_dir}')
 
+            latest_link = cal_dir.parent / 'latest/'
+            if latest_link.exists() and latest_link.is_symlink():
+                latest_link.unlink()
+            latest_link.symlink_to(pathlib.Path(cal_dir))
+
         # save and replace objects with paths
         calibration = save_from_dict(calibration,cal_dir)
 
