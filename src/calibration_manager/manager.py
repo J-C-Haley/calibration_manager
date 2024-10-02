@@ -215,11 +215,13 @@ class Setup:
         self.save_component_cal('example_component',cal,overwrite=True)
 
 def load_to_dict(d:dict,dir:pathlib.Path):
+    if not d:
+        return
     for k, v in d.items():
         if isinstance(v,str):
             f = dir / v
             if f.is_file() and f.suffix == '.npy':
-                d[k] = np.load(f)
+                d[k] = np.load(f, allow_pickle=True)
 
             if f.is_file() and f.suffix == '.csv':
                 d[k] = pd.read_csv(f)
