@@ -253,7 +253,7 @@ class SetupManager(Plugin):
         # put recording topics into tree
         if 'bags' in self.setup and self.setup['bags'] is not None:
             for grp in self.setup['bags']:
-                grp_item = self.new_topic_group(group_name=grp['group_name'],enabled=grp['enabled'])
+                grp_item = self.new_topic_group(group_name=grp['group_name'],enabled=grp['enabled'],end_delay=grp['end_delay'])
                 for tpc in grp['topics']: #self.setup['topics'][group_name].items():
                     self.load_topic(tpc, grp_item)
         self._widget.topicTreeWidget.resizeColumnToContents(0)
@@ -469,9 +469,11 @@ class SetupManager(Plugin):
         tpc_item._name = topic['topic_name']
         tpc_item.setText(0,tpc_item._name)
     
-    def new_topic_group(self, group_name: str='UNTITLEDBAGGROUP', enabled: bool=True):
+    def new_topic_group(self, group_name: str='UNTITLEDBAGGROUP', enabled: bool=True, end_delay: float=0.0):
         if group_name == False:
             group_name = 'UNTITLEDBAGGROUP'
+        if end_delay == False or end_delay == None:
+            end_delay = 0.0
         grp_item = TopicGroupTreeWidgetItem(self._widget.topicTreeWidget)
         grp_item.setFlags(grp_item.flags() | Qt.ItemIsEditable)
         grp_item.setFlags(grp_item.flags() | Qt.ItemIsUserCheckable)
@@ -483,7 +485,7 @@ class SetupManager(Plugin):
         grp_item.editable = [1,1]
         grp_item._name = group_name
         grp_item.setText(0,grp_item._name)
-        grp_item.setText(1,'0')
+        grp_item.setText(1,str(int(end_delay)))
         return grp_item
 
     def new_topic(self):
