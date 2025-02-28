@@ -31,7 +31,7 @@ class SetupManager(Plugin):
         super(SetupManager, self).__init__(context)
         self.setObjectName('SetupManager')
 
-        self.cmp_types = []
+        self.cmp_type_boxes = []
 
         ### Create QWidget
         self._widget = QWidget()
@@ -280,7 +280,7 @@ class SetupManager(Plugin):
         cmb.addItem('routine', '3')
         cmb.setCurrentText(cmp['component_type'])
         self._widget.componentTreeWidget.setItemWidget(cmp_item, 2 , cmb)
-        self.cmp_types.append((cmp_item,cmb))
+        self.cmp_type_boxes.append((cmp_item,cmb))
 
         # add meta params
         p = TreeWidgetItem(cmp_item)
@@ -536,7 +536,7 @@ class SetupManager(Plugin):
             nodes = get_subtree_nodes(cmp_item)
             component_name = str(cmp_item.data(0,0))
 
-            for stored_cmp_item, cmb in self.cmp_types: # read comboboxes
+            for stored_cmp_item, cmb in self.cmp_type_boxes: # read comboboxes
                 if cmp_item is stored_cmp_item:
                     cmp_type = cmb.currentText()
 
