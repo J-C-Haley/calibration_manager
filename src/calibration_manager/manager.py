@@ -240,7 +240,7 @@ def save_from_dict(d:dict,dir:pathlib.Path,file_ns:str=''):
             d[k] = file_ns+k+'.npy' # replaces key with npy path
             np.save(dir / d[k], v)
 
-        elif isinstance(v,np.float):
+        elif isinstance(v,float):
             d[k] = float(d[k])
 
         elif isinstance(v, dict): # recurses
